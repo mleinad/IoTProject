@@ -1,15 +1,6 @@
 from mysql.connector import Error
 
 def create_normalized_tables(connection):
-    """
-    Create all normalized tables for the EV charging database.
-    
-    Args:
-        connection: MySQL connection object
-    
-    Returns:
-        bool: True if successful, False otherwise
-    """
     try:
         cursor = connection.cursor()
         
@@ -94,15 +85,6 @@ def create_normalized_tables(connection):
         return False
 
 def drop_all_tables(connection):
-    """
-    Drop all tables (useful for testing/resetting database).
-    
-    Args:
-        connection: MySQL connection object
-    
-    Returns:
-        bool: True if successful, False otherwise
-    """
     try:
         cursor = connection.cursor()
         
@@ -129,12 +111,6 @@ def drop_all_tables(connection):
         return False
 
 def get_table_info(connection):
-    """
-    Display information about all tables in the database.
-    
-    Args:
-        connection: MySQL connection object
-    """
     try:
         cursor = connection.cursor()
         

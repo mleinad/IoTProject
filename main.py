@@ -12,7 +12,7 @@ def main():
     MYSQL_CONNECTOR_PASSWORD = os.getenv("MYSQL_DB_PASSWORD")
 
     mysql_database = "IoT_project"
-    csv_file_path = "Data/dataset-EV_with_stations.csv"  # Update with your actual CSV file path
+    csv_file_path = "Data/dataset-EV_with_stations.csv" 
 
     MYSQL_CONNECTOR = [MYSQL_CONNECTOR_HOST, 
                        MYSQL_CONNECTOR_USER, 

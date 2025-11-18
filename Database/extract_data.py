@@ -3,15 +3,6 @@ from datetime import datetime
 from mysql.connector import Error
 
 def parse_csv_datetime(date_str):
-    """
-    Parse datetime from DD/MM/YY HH:MM format.
-    
-    Args:
-        date_str: Date string in DD/MM/YY HH:MM format
-    
-    Returns:
-        datetime object or None if parsing fails
-    """
     try:
         return datetime.strptime(date_str, '%d/%m/%y %H:%M')
     except ValueError:
@@ -20,30 +11,12 @@ def parse_csv_datetime(date_str):
 
 
 def parse_decimal(value_str):
-    """
-    Convert comma decimal separator to dot and handle empty values.
-    
-    Args:
-        value_str: String with comma as decimal separator
-    
-    Returns:
-        String with dot as decimal separator, or None for empty values
-    """
     if not value_str or value_str.strip() == '':
         return None
     return value_str.replace(',', '.')
 
 
 def parse_int(value_str):
-    """
-    Parse integer value and handle empty strings.
-    
-    Args:
-        value_str: String representation of integer
-    
-    Returns:
-        Integer value or None for empty values
-    """
     if not value_str or value_str.strip() == '':
         return None
     try:
@@ -53,18 +26,6 @@ def parse_int(value_str):
 
 
 def extract_ev_charging_data_normalized(csv_file_path, connection, batch_size=1000):
-    """
-    Extract EV charging data from CSV and insert into normalized database structure.
-    Uses batch inserts for improved performance.
-    
-    Args:
-        csv_file_path: Path to the CSV file
-        connection: MySQL connection object
-        batch_size: Number of rows to insert in each batch (default: 1000)
-    
-    Returns:
-        bool: True if successful, False otherwise
-    """
     try:
         cursor = connection.cursor()
         
@@ -212,13 +173,6 @@ def extract_ev_charging_data_normalized(csv_file_path, connection, batch_size=10
 
 
 def _insert_session_batch(cursor, batch_data):
-    """
-    Internal helper function to perform batch insert of charging sessions.
-    
-    Args:
-        cursor: MySQL cursor object
-        batch_data: List of tuples containing session data
-    """
     sql = """INSERT INTO charging_sessions 
              (user_id, vehicle_id, station_id, charging_start_time, 
               charging_end_time, energy_consumed_kwh, charging_duration_hours,
@@ -231,18 +185,6 @@ def _insert_session_batch(cursor, batch_data):
 
 
 def extract_with_progress(csv_file_path, connection, batch_size=1000, show_progress=True):
-    """
-    Extract data with progress reporting (useful for large files).
-    
-    Args:
-        csv_file_path: Path to the CSV file
-        connection: MySQL connection object
-        batch_size: Number of rows to insert in each batch
-        show_progress: Whether to show progress updates
-    
-    Returns:
-        bool: True if successful, False otherwise
-    """
     if show_progress:
         # Count total rows first (optional, for progress percentage)
         with open(csv_file_path, 'r', encoding='utf-8-sig') as f:

@@ -2,16 +2,6 @@ import mysql.connector
 from mysql.connector import Error, pooling
 
 def connect_mysql(MYSQLCONNECTOR, database):
-    """
-    Connect to MySQL database.
-    
-    Args:
-        MYSQLCONNECTOR: List containing [host, user, password]
-        database: Database name (use empty string to connect without selecting a database)
-    
-    Returns:
-        MySQL connection object or None if connection fails
-    """
     conn = None
     try:
         if database:
@@ -35,17 +25,17 @@ def connect_mysql(MYSQLCONNECTOR, database):
         if conn.is_connected():
             db_info = conn.get_server_info()
             if database:
-                print(f"Connected to MySQL Server version {db_info}")
+                print(f"Connected to MySQL Server version")
                 print(f"Connected to database: '{database}'")
             else:
-                print(f"Connected to MySQL Server version {db_info}")
+                print(f"Connected to MySQL Server version")
                 
     except Error as e:
         print(f"Error connecting to MySQL: {e}")
         
     return conn
 
-
+# nao sei se vamos usar pooling mas fica aqui
 def create_connection_pool(MYSQLCONNECTOR, database, pool_name="mypool", pool_size=5):
     """
     Create a MySQL connection pool for better performance with multiple connections.
