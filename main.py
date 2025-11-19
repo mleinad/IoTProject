@@ -1,8 +1,9 @@
 import os
 from dotenv import load_dotenv
 from Database.mysql_connector import connect_mysql
-from Database.create_tables import create_normalized_tables, get_table_info
-from Database.extract_data import extract_ev_charging_data_normalized
+from Database.create_tables import create_denormalized_table, get_table_info, drop_all_tables
+from Database.extract_data import extract_ev_charging_data_simple
+from Database.queries import *
 
 def main():
     # Load environment variables
@@ -18,16 +19,14 @@ def main():
                        MYSQL_CONNECTOR_USER, 
                        MYSQL_CONNECTOR_PASSWORD]
 
+#    drop_all_tables(connect_mysql(MYSQL_CONNECTOR, mysql_database))
+
     # Create database if it doesn't exist
-    sqlConnection = connect_mysql(MYSQL_CONNECTOR, "")
-    if sqlConnection is None:
-        print("Failed to connect to MySQL server")
-        return
-    
-    mycursor = sqlConnection.cursor()
-    mycursor.execute(f"CREATE DATABASE IF NOT EXISTS {mysql_database}")
-    print(f"Database '{mysql_database}' ready\n")
-    sqlConnection.close()
+#    sqlConnection = connect_mysql(MYSQL_CONNECTOR, "")
+#    mycursor = sqlConnection.cursor()
+#    mycursor.execute(f"CREATE DATABASE IF NOT EXISTS {mysql_database}")
+#    print(f"Database '{mysql_database}' ready\n")
+#    sqlConnection.close()
 
     # Connect to the database
     sqlConnection = connect_mysql(MYSQL_CONNECTOR, mysql_database)
@@ -36,21 +35,26 @@ def main():
         return
 
     # Create tables
-    if not create_normalized_tables(sqlConnection):
+    if not create_denormalized_table(sqlConnection):
         print("Failed to create tables")
         sqlConnection.close()
         return
 
     # Import CSV data
-    print(f"Starting CSV import from: {csv_file_path}")
-    if extract_ev_charging_data_normalized(csv_file_path, sqlConnection):
+#    print(f"Starting CSV import from: {csv_file_path}")
+    if extract_ev_charging_data_simple(csv_file_path, sqlConnection, "ev_charging_data"):
         print("CSV data imported successfully!\n")
         get_table_info(sqlConnection)
     else:
         print("CSV import failed!")
 
+    # QUERIES
+    # Run any query you want
+    results = get_station_utilization_rate(sqlConnection)
+    for row in results[:5]:
+        print(row)
     sqlConnection.close()
-    print("Database connection closed")
+    print("\nDatabase connection closed")
 
 if __name__ == "__main__":
     main()
