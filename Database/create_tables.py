@@ -1,11 +1,16 @@
-import mysql.connector
+from mysql.connector import Error
 
 
 def create_denormalized_table(connection):
+    """
+    Create a single denormalized table for EV charging data.
+    """
     try:
         cursor = connection.cursor()
-                
-        # Single denormalized table with all EV charging data
+        
+        print("Creating database tables...")
+        
+        # Main EV charging data table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS ev_charging_data (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -34,59 +39,103 @@ def create_denormalized_table(connection):
                 INDEX idx_time_of_day (time_of_day)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         """)
+        print("✓ EV charging data table created")
+        
+        # Stations table with location data
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ev_stations (
+                station_id VARCHAR(50) PRIMARY KEY,
+                distrito VARCHAR(100),
+                concelho VARCHAR(100),
+                freguesia VARCHAR(100),
+                latitude DECIMAL(10,7),
+                longitude DECIMAL(10,7),
+                potencia_maxima_kw DECIMAL(8,2),
+                pontos_ligacao INT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_distrito (distrito),
+                INDEX idx_concelho (concelho),
+                INDEX idx_location (latitude, longitude)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        """)
+        print("✓ EV stations table created")
         
         connection.commit()
         cursor.close()
-        print("\nTable created successfully!\n")
+        print("\nTables created successfully!\n")
         return True
         
-    except mysql.connector.Error as e:
-        print(f"Error creating table: {e}")
+    except Error as e:
+        print(f"Error creating tables: {e}")
         return False
 
 
 def drop_all_tables(connection):
+    """
+    Drop all tables (useful for testing/resetting database).
+    """
     try:
         cursor = connection.cursor()
-                
+        
+        print("Dropping all tables...")
+        
         cursor.execute("DROP TABLE IF EXISTS ev_charging_data")
+        cursor.execute("DROP TABLE IF EXISTS ev_stations")
         
         connection.commit()
         cursor.close()
-        print("Table dropped successfully!\n")
+        print("All tables dropped successfully!\n")
         return True
         
-    except mysql.connector.Error as e:
-        print(f"Error dropping table: {e}")
+    except Error as e:
+        print(f"Error dropping tables: {e}")
         return False
 
 
 def get_table_info(connection):
+    """
+    Display information about all tables in the database.
+    """
     try:
         cursor = connection.cursor()
         
         print("\n=== Database Statistics ===")
+        
+        # Charging data stats
         cursor.execute("SELECT COUNT(*) FROM ev_charging_data")
         count = cursor.fetchone()[0]
         print(f"Total charging sessions: {count}")
         
-        # Additional statistics
-        cursor.execute("SELECT COUNT(DISTINCT user_id) FROM ev_charging_data")
-        users = cursor.fetchone()[0]
-        print(f"Unique users: {users}")
+        if count > 0:
+            cursor.execute("SELECT COUNT(DISTINCT user_id) FROM ev_charging_data")
+            users = cursor.fetchone()[0]
+            print(f"Unique users: {users}")
+            
+            cursor.execute("SELECT COUNT(DISTINCT charging_station_id) FROM ev_charging_data")
+            stations_used = cursor.fetchone()[0]
+            print(f"Charging stations used: {stations_used}")
+            
+            cursor.execute("SELECT COUNT(DISTINCT vehicle_model) FROM ev_charging_data")
+            models = cursor.fetchone()[0]
+            print(f"Unique vehicle models: {models}")
         
-        cursor.execute("SELECT COUNT(DISTINCT charging_station_id) FROM ev_charging_data")
+        # Stations stats
+        cursor.execute("SELECT COUNT(*) FROM ev_stations")
         stations = cursor.fetchone()[0]
-        print(f"Unique charging stations: {stations}")
+        print(f"\nTotal stations in database: {stations}")
         
-        cursor.execute("SELECT COUNT(DISTINCT vehicle_model) FROM ev_charging_data")
-        models = cursor.fetchone()[0]
-        print(f"Unique vehicle models: {models}")
+        if stations > 0:
+            cursor.execute("SELECT COUNT(DISTINCT distrito) FROM ev_stations")
+            distritos = cursor.fetchone()[0]
+            print(f"Distritos covered: {distritos}")
+            
+            cursor.execute("SELECT COUNT(DISTINCT concelho) FROM ev_stations")
+            concelhos = cursor.fetchone()[0]
+            print(f"Concelhos covered: {concelhos}")
         
         print("===========================\n")
         
         cursor.close()
         
-    except mysql.connector.Error as e:
+    except Error as e:
         print(f"Error getting table info: {e}")
-        return False

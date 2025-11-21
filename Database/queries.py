@@ -55,9 +55,7 @@ def query_to_dataframe(connection, query, params=None):
 # ========================================
 
 def get_daily_trends(connection):
-    """
-    Get daily aggregated charging statistics.
-    """
+    """Get daily aggregated charging statistics."""
     query = """
         SELECT 
             DATE(charging_start_time) as date,
@@ -71,20 +69,18 @@ def get_daily_trends(connection):
             COUNT(DISTINCT charging_station_id) as stations_used
         FROM ev_charging_data
         GROUP BY DATE(charging_start_time)
-        ORDER BY date
+        ORDER BY DATE(charging_start_time)
     """
     return execute_query(connection, query)
 
 
 def get_weekly_trends(connection):
-    """
-    Get weekly aggregated charging statistics.
-    """
+    """Get weekly aggregated charging statistics."""
     query = """
         SELECT 
             YEAR(charging_start_time) as year,
-            WEEK(charging_start_time) as week_number,
-            DATE_FORMAT(charging_start_time, '%Y-W%u') as year_week,
+            WEEK(charging_start_time, 1) as week_number,
+            CONCAT(YEAR(charging_start_time), '-W', LPAD(WEEK(charging_start_time, 1), 2, '0')) as year_week,
             MIN(DATE(charging_start_time)) as week_start,
             MAX(DATE(charging_start_time)) as week_end,
             COUNT(*) as total_sessions,
@@ -95,22 +91,20 @@ def get_weekly_trends(connection):
             ROUND(AVG(charging_duration_hours), 2) as avg_duration_hours,
             COUNT(DISTINCT user_id) as unique_users
         FROM ev_charging_data
-        GROUP BY YEAR(charging_start_time), WEEK(charging_start_time)
-        ORDER BY year, week_number
+        GROUP BY YEAR(charging_start_time), WEEK(charging_start_time, 1)
+        ORDER BY YEAR(charging_start_time), WEEK(charging_start_time, 1)
     """
     return execute_query(connection, query)
 
 
 def get_monthly_trends(connection):
-    """
-    Get monthly aggregated charging statistics.
-    """
+    """Get monthly aggregated charging statistics."""
     query = """
         SELECT 
-            DATE_FORMAT(charging_start_time, '%Y-%m') as month,
+            CONCAT(YEAR(charging_start_time), '-', LPAD(MONTH(charging_start_time), 2, '0')) as month,
             YEAR(charging_start_time) as year,
             MONTH(charging_start_time) as month_number,
-            DATE_FORMAT(charging_start_time, '%M %Y') as month_name,
+            DATE_FORMAT(MIN(charging_start_time), '%M %Y') as month_name,
             COUNT(*) as total_sessions,
             ROUND(SUM(energy_consumed_kwh), 2) as total_energy_kwh,
             ROUND(AVG(energy_consumed_kwh), 2) as avg_energy_kwh,
@@ -120,16 +114,14 @@ def get_monthly_trends(connection):
             COUNT(DISTINCT user_id) as unique_users,
             COUNT(DISTINCT charging_station_id) as stations_used
         FROM ev_charging_data
-        GROUP BY DATE_FORMAT(charging_start_time, '%Y-%m')
-        ORDER BY month
+        GROUP BY YEAR(charging_start_time), MONTH(charging_start_time)
+        ORDER BY YEAR(charging_start_time), MONTH(charging_start_time)
     """
     return execute_query(connection, query)
 
 
 def get_trend_comparison(connection):
-    """
-    Compare daily, weekly, and monthly trends side by side.
-    """
+    """Compare daily, weekly, and monthly trends side by side."""
     query = """
         SELECT 
             'Daily Average' as period_type,
@@ -155,12 +147,13 @@ def get_trend_comparison(connection):
             ROUND(AVG(weekly_revenue), 2) as avg_revenue
         FROM (
             SELECT 
-                WEEK(charging_start_time) as week,
+                YEAR(charging_start_time) as year,
+                WEEK(charging_start_time, 1) as week,
                 COUNT(*) as weekly_sessions,
                 SUM(energy_consumed_kwh) as weekly_energy,
                 SUM(charging_cost_eur) as weekly_revenue
             FROM ev_charging_data
-            GROUP BY WEEK(charging_start_time)
+            GROUP BY YEAR(charging_start_time), WEEK(charging_start_time, 1)
         ) weekly_stats
         
         UNION ALL
@@ -172,13 +165,30 @@ def get_trend_comparison(connection):
             ROUND(AVG(monthly_revenue), 2) as avg_revenue
         FROM (
             SELECT 
+                YEAR(charging_start_time) as year,
                 MONTH(charging_start_time) as month,
                 COUNT(*) as monthly_sessions,
                 SUM(energy_consumed_kwh) as monthly_energy,
                 SUM(charging_cost_eur) as monthly_revenue
             FROM ev_charging_data
-            GROUP BY MONTH(charging_start_time)
+            GROUP BY YEAR(charging_start_time), MONTH(charging_start_time)
         ) monthly_stats
+    """
+    return execute_query(connection, query)
+
+
+def get_hourly_distribution(connection):
+    """Analyze charging distribution by hour of day."""
+    query = """
+        SELECT 
+            HOUR(charging_start_time) as hour,
+            COUNT(*) as session_count,
+            ROUND(AVG(charging_cost_eur), 2) as avg_cost,
+            ROUND(AVG(energy_consumed_kwh), 2) as avg_energy,
+            ROUND(AVG(charging_duration_hours), 2) as avg_duration
+        FROM ev_charging_data
+        GROUP BY HOUR(charging_start_time)
+        ORDER BY HOUR(charging_start_time)
     """
     return execute_query(connection, query)
 
@@ -226,7 +236,7 @@ def get_energy_by_vehicle_model(connection):
     return execute_query(connection, query)
 
 
-def get_energy_by_station(connection, limit=5):
+def get_energy_by_station(connection, limit=50):
     """
     Energy delivered breakdown by charging station.
     """
@@ -245,26 +255,22 @@ def get_energy_by_station(connection, limit=5):
     """
     return execute_query(connection, query, (limit,))
 
-
 def get_daily_energy_delivered(connection):
-    """
-    Daily energy delivery trends.
-    """
+    """Daily energy delivery trends."""
     query = """
         SELECT 
             DATE(charging_start_time) as date,
             COUNT(*) as sessions,
             ROUND(SUM(energy_consumed_kwh), 2) as total_energy_kwh,
             ROUND(AVG(energy_consumed_kwh), 2) as avg_energy_kwh,
-            ROUND(SUM(energy_consumed_kwh) / SUM(charging_duration_hours), 2) as avg_power_kw
+            ROUND(SUM(energy_consumed_kwh) / NULLIF(SUM(charging_duration_hours), 0), 2) as avg_power_kw
         FROM ev_charging_data
         WHERE energy_consumed_kwh IS NOT NULL 
               AND charging_duration_hours > 0
         GROUP BY DATE(charging_start_time)
-        ORDER BY date
+        ORDER BY DATE(charging_start_time)
     """
     return execute_query(connection, query)
-
 
 # ========================================
 # CHARGING DURATION ANALYSIS
@@ -397,24 +403,20 @@ def get_time_of_day_distribution(connection):
     """
     return execute_query(connection, query)
 
-
 def get_hourly_distribution(connection):
     """
-    Distribution of charging sessions by hour of day.
+    Analyze charging distribution by hour of day.
     """
     query = """
         SELECT 
             HOUR(charging_start_time) as hour,
             COUNT(*) as session_count,
-            ROUND(AVG(charging_cost_eur), 2) as avg_cost,
-            ROUND(AVG(energy_consumed_kwh), 2) as avg_energy,
-            ROUND(AVG(charging_duration_hours), 2) as avg_duration
+            ROUND(AVG(charging_cost_eur), 2) as avg_cost
         FROM ev_charging_data
         GROUP BY HOUR(charging_start_time)
         ORDER BY hour
     """
     return execute_query(connection, query)
-
 
 def get_day_of_week_distribution(connection):
     """
@@ -470,9 +472,7 @@ def get_weekend_vs_weekday(connection):
 # ========================================
 
 def get_daily_cost_trends(connection):
-    """
-    Daily cost trends over time.
-    """
+    """Daily cost trends over time."""
     query = """
         SELECT 
             DATE(charging_start_time) as date,
@@ -484,56 +484,50 @@ def get_daily_cost_trends(connection):
         FROM ev_charging_data
         WHERE charging_cost_eur IS NOT NULL
         GROUP BY DATE(charging_start_time)
-        ORDER BY date
+        ORDER BY DATE(charging_start_time)
     """
     return execute_query(connection, query)
 
 
 def get_weekly_cost_trends(connection):
-    """
-    Weekly cost trends over time.
-    """
+    """Weekly cost trends over time."""
     query = """
         SELECT 
-            DATE_FORMAT(charging_start_time, '%Y-W%u') as year_week,
+            CONCAT(YEAR(charging_start_time), '-W', LPAD(WEEK(charging_start_time, 1), 2, '0')) as year_week,
             MIN(DATE(charging_start_time)) as week_start,
             COUNT(*) as sessions,
             ROUND(SUM(charging_cost_eur), 2) as total_cost,
             ROUND(AVG(charging_cost_eur), 2) as avg_cost_per_session
         FROM ev_charging_data
         WHERE charging_cost_eur IS NOT NULL
-        GROUP BY DATE_FORMAT(charging_start_time, '%Y-W%u')
-        ORDER BY year_week
+        GROUP BY YEAR(charging_start_time), WEEK(charging_start_time, 1)
+        ORDER BY YEAR(charging_start_time), WEEK(charging_start_time, 1)
     """
     return execute_query(connection, query)
 
 
 def get_monthly_cost_trends(connection):
-    """
-    Monthly cost trends over time.
-    """
+    """Monthly cost trends over time."""
     query = """
         SELECT 
-            DATE_FORMAT(charging_start_time, '%Y-%m') as month,
-            DATE_FORMAT(charging_start_time, '%M %Y') as month_name,
+            CONCAT(YEAR(charging_start_time), '-', LPAD(MONTH(charging_start_time), 2, '0')) as month,
+            DATE_FORMAT(MIN(charging_start_time), '%M %Y') as month_name,
             COUNT(*) as sessions,
             ROUND(SUM(charging_cost_eur), 2) as total_cost,
             ROUND(AVG(charging_cost_eur), 2) as avg_cost_per_session,
             ROUND(SUM(energy_consumed_kwh), 2) as total_energy,
-            ROUND(SUM(charging_cost_eur) / SUM(energy_consumed_kwh), 2) as cost_per_kwh
+            ROUND(SUM(charging_cost_eur) / NULLIF(SUM(energy_consumed_kwh), 0), 2) as cost_per_kwh
         FROM ev_charging_data
         WHERE charging_cost_eur IS NOT NULL 
               AND energy_consumed_kwh > 0
-        GROUP BY DATE_FORMAT(charging_start_time, '%Y-%m')
-        ORDER BY month
+        GROUP BY YEAR(charging_start_time), MONTH(charging_start_time)
+        ORDER BY YEAR(charging_start_time), MONTH(charging_start_time)
     """
     return execute_query(connection, query)
 
 
 def get_cost_trends_by_time_of_day(connection):
-    """
-    Cost trends by time of day over time periods.
-    """
+    """Cost trends by time of day over time periods."""
     query = """
         SELECT 
             DATE(charging_start_time) as date,
@@ -544,10 +538,26 @@ def get_cost_trends_by_time_of_day(connection):
         WHERE time_of_day IS NOT NULL 
               AND charging_cost_eur IS NOT NULL
         GROUP BY DATE(charging_start_time), time_of_day
-        ORDER BY date, time_of_day
+        ORDER BY DATE(charging_start_time), time_of_day
     """
     return execute_query(connection, query)
 
+def get_cost_statistics(connection):
+    """
+    Overall cost statistics across all charging sessions.
+    """
+    query = """
+        SELECT 
+            COUNT(*) as total_sessions,
+            ROUND(AVG(charging_cost_eur), 2) as avg_cost,
+            ROUND(MIN(charging_cost_eur), 2) as min_cost,
+            ROUND(MAX(charging_cost_eur), 2) as max_cost,
+            ROUND(SUM(charging_cost_eur), 2) as total_revenue,
+            ROUND(STD(charging_cost_eur), 2) as cost_std_dev
+        FROM ev_charging_data
+        WHERE charging_cost_eur IS NOT NULL
+    """
+    return execute_query(connection, query)
 
 # ========================================
 # USAGE PER USER
@@ -619,7 +629,7 @@ def get_user_daily_usage(connection, user_id=None):
         return execute_query(connection, query)
 
 
-def get_top_users_ranking(connection, limit=5):
+def get_top_users_ranking(connection, limit=50):
     """
     Rank top users by multiple metrics.
     """
@@ -649,25 +659,33 @@ def get_top_users_ranking(connection, limit=5):
 
 def get_usage_per_station(connection):
     """
-    Comprehensive usage statistics per charging station.
+    Comprehensive usage statistics per charging station with location data.
     """
     query = """
         SELECT 
-            charging_station_id,
+            c.charging_station_id,
+            s.distrito,
+            s.concelho,
+            s.freguesia,
+            ROUND(s.potencia_maxima_kw, 2) as station_power_kw,
+            s.pontos_ligacao as connection_points,
             COUNT(*) as total_sessions,
-            COUNT(DISTINCT user_id) as unique_users,
-            ROUND(SUM(charging_cost_eur), 2) as total_revenue,
-            ROUND(AVG(charging_cost_eur), 2) as avg_revenue_per_session,
-            ROUND(SUM(energy_consumed_kwh), 2) as total_energy_delivered,
-            ROUND(AVG(energy_consumed_kwh), 2) as avg_energy_per_session,
-            ROUND(AVG(charging_duration_hours), 2) as avg_duration_hours,
-            ROUND(AVG(charging_rate_kw), 2) as avg_charging_rate_kw,
-            COUNT(DISTINCT DATE(charging_start_time)) as days_active
-        FROM ev_charging_data
-        GROUP BY charging_station_id
+            COUNT(DISTINCT c.user_id) as unique_users,
+            ROUND(SUM(c.charging_cost_eur), 2) as total_revenue,
+            ROUND(AVG(c.charging_cost_eur), 2) as avg_revenue_per_session,
+            ROUND(SUM(c.energy_consumed_kwh), 2) as total_energy_delivered,
+            ROUND(AVG(c.energy_consumed_kwh), 2) as avg_energy_per_session,
+            ROUND(AVG(c.charging_duration_hours), 2) as avg_duration_hours,
+            ROUND(AVG(c.charging_rate_kw), 2) as avg_charging_rate_kw,
+            COUNT(DISTINCT DATE(c.charging_start_time)) as days_active
+        FROM ev_charging_data c
+        LEFT JOIN ev_stations s ON c.charging_station_id = s.station_id
+        GROUP BY c.charging_station_id, s.distrito, s.concelho, s.freguesia,
+                 s.potencia_maxima_kw, s.pontos_ligacao
         ORDER BY total_sessions DESC
     """
     return execute_query(connection, query)
+
 
 
 def get_station_daily_usage(connection, station_id=None):
@@ -714,7 +732,7 @@ def get_station_utilization_rate(connection):
     return execute_query(connection, query)
 
 
-def get_top_stations_ranking(connection, limit=5):
+def get_top_stations_ranking(connection, limit=50):
     """
     Rank top stations by multiple metrics.
     """
@@ -751,3 +769,377 @@ def get_station_peak_hours(connection, station_id):
         ORDER BY sessions DESC
     """
     return execute_query(connection, query, (station_id,))
+
+# ========================================
+# STATION LOCATION & GEOGRAPHIC QUERIES
+# ========================================
+
+def get_stations_by_distrito(connection):
+    """
+    Get station count and statistics by distrito.
+    """
+    query = """
+        SELECT 
+            distrito,
+            COUNT(*) as total_stations,
+            ROUND(AVG(potencia_maxima_kw), 2) as avg_power_kw,
+            ROUND(MIN(potencia_maxima_kw), 2) as min_power_kw,
+            ROUND(MAX(potencia_maxima_kw), 2) as max_power_kw,
+            SUM(pontos_ligacao) as total_connection_points
+        FROM ev_stations
+        GROUP BY distrito
+        ORDER BY total_stations DESC
+    """
+    return execute_query(connection, query)
+
+
+def get_stations_by_concelho(connection, distrito=None):
+    """
+    Get station count by concelho, optionally filtered by distrito.
+    """
+    query = """
+        SELECT 
+            distrito,
+            concelho,
+            COUNT(*) as total_stations,
+            ROUND(AVG(potencia_maxima_kw), 2) as avg_power_kw,
+            SUM(pontos_ligacao) as total_connection_points
+        FROM ev_stations
+    """
+    
+    if distrito:
+        query += " WHERE distrito = %s"
+        query += " GROUP BY distrito, concelho ORDER BY total_stations DESC"
+        return execute_query(connection, query, (distrito,))
+    else:
+        query += " GROUP BY distrito, concelho ORDER BY total_stations DESC LIMIT 50"
+        return execute_query(connection, query)
+
+
+def get_stations_by_freguesia(connection, concelho=None):
+    """
+    Get station count by freguesia, optionally filtered by concelho.
+    """
+    query = """
+        SELECT 
+            distrito,
+            concelho,
+            freguesia,
+            COUNT(*) as total_stations,
+            ROUND(AVG(potencia_maxima_kw), 2) as avg_power_kw
+        FROM ev_stations
+    """
+    
+    if concelho:
+        query += " WHERE concelho = %s"
+        query += " GROUP BY distrito, concelho, freguesia ORDER BY total_stations DESC"
+        return execute_query(connection, query, (concelho,))
+    else:
+        query += " GROUP BY distrito, concelho, freguesia ORDER BY total_stations DESC LIMIT 50"
+        return execute_query(connection, query)
+
+
+def get_power_distribution(connection):
+    """
+    Analyze distribution of station power capacities.
+    """
+    query = """
+        SELECT 
+            CASE 
+                WHEN potencia_maxima_kw < 50 THEN '< 50 kW (Slow)'
+                WHEN potencia_maxima_kw BETWEEN 50 AND 100 THEN '50-100 kW (Medium)'
+                WHEN potencia_maxima_kw BETWEEN 100 AND 150 THEN '100-150 kW (Fast)'
+                WHEN potencia_maxima_kw BETWEEN 150 AND 300 THEN '150-300 kW (Very Fast)'
+                ELSE '> 300 kW (Ultra Fast)'
+            END as power_category,
+            COUNT(*) as station_count,
+            ROUND((COUNT(*) * 100.0 / (SELECT COUNT(*) FROM ev_stations)), 2) as percentage,
+            ROUND(AVG(potencia_maxima_kw), 2) as avg_power,
+            SUM(pontos_ligacao) as total_connection_points
+        FROM ev_stations
+        WHERE potencia_maxima_kw IS NOT NULL
+        GROUP BY power_category
+        ORDER BY 
+            CASE power_category
+                WHEN '< 50 kW (Slow)' THEN 1
+                WHEN '50-100 kW (Medium)' THEN 2
+                WHEN '100-150 kW (Fast)' THEN 3
+                WHEN '150-300 kW (Very Fast)' THEN 4
+                ELSE 5
+            END
+    """
+    return execute_query(connection, query)
+
+
+def get_high_power_stations(connection, min_power=150, limit=50):
+    """
+    Find high-power charging stations (fast chargers).
+    """
+    query = """
+        SELECT 
+            station_id,
+            distrito,
+            concelho,
+            freguesia,
+            ROUND(potencia_maxima_kw, 2) as power_kw,
+            pontos_ligacao as connection_points,
+            ROUND(latitude, 5) as lat,
+            ROUND(longitude, 5) as lon
+        FROM ev_stations
+        WHERE potencia_maxima_kw >= %s
+        ORDER BY potencia_maxima_kw DESC
+        LIMIT %s
+    """
+    return execute_query(connection, query, (min_power, limit))
+
+
+def get_connection_points_analysis(connection):
+    """
+    Analyze distribution of connection points per station.
+    """
+    query = """
+        SELECT 
+            pontos_ligacao as connection_points,
+            COUNT(*) as station_count,
+            ROUND((COUNT(*) * 100.0 / (SELECT COUNT(*) FROM ev_stations)), 2) as percentage,
+            ROUND(AVG(potencia_maxima_kw), 2) as avg_power_kw
+        FROM ev_stations
+        WHERE pontos_ligacao IS NOT NULL
+        GROUP BY pontos_ligacao
+        ORDER BY pontos_ligacao
+    """
+    return execute_query(connection, query)
+
+
+# ========================================
+# CHARGING DATA + STATION LOCATION JOINS
+# ========================================
+
+def get_charging_sessions_with_location(connection, limit=100):
+    """
+    Get charging sessions with station location information.
+    """
+    query = """
+        SELECT 
+            c.charging_station_id,
+            s.distrito,
+            s.concelho,
+            s.freguesia,
+            COUNT(*) as sessions,
+            ROUND(AVG(c.energy_consumed_kwh), 2) as avg_energy,
+            ROUND(AVG(c.charging_cost_eur), 2) as avg_cost,
+            ROUND(AVG(c.charging_duration_hours), 2) as avg_duration,
+            ROUND(s.potencia_maxima_kw, 2) as station_power_kw,
+            s.pontos_ligacao as connection_points
+        FROM ev_charging_data c
+        LEFT JOIN ev_stations s ON c.charging_station_id = s.station_id
+        GROUP BY c.charging_station_id, s.distrito, s.concelho, s.freguesia, 
+                 s.potencia_maxima_kw, s.pontos_ligacao
+        ORDER BY sessions DESC
+        LIMIT %s
+    """
+    return execute_query(connection, query, (limit,))
+
+
+def get_usage_by_distrito(connection):
+    """
+    Analyze charging usage patterns by distrito.
+    """
+    query = """
+        SELECT 
+            s.distrito,
+            COUNT(DISTINCT c.charging_station_id) as stations_used,
+            COUNT(*) as total_sessions,
+            COUNT(DISTINCT c.user_id) as unique_users,
+            ROUND(SUM(c.energy_consumed_kwh), 2) as total_energy_kwh,
+            ROUND(AVG(c.energy_consumed_kwh), 2) as avg_energy_per_session,
+            ROUND(SUM(c.charging_cost_eur), 2) as total_revenue,
+            ROUND(AVG(c.charging_cost_eur), 2) as avg_cost_per_session
+        FROM ev_charging_data c
+        LEFT JOIN ev_stations s ON c.charging_station_id = s.station_id
+        WHERE s.distrito IS NOT NULL
+        GROUP BY s.distrito
+        ORDER BY total_sessions DESC
+    """
+    return execute_query(connection, query)
+
+
+def get_usage_by_concelho(connection, distrito=None):
+    """
+    Analyze charging usage patterns by concelho.
+    """
+    query = """
+        SELECT 
+            s.distrito,
+            s.concelho,
+            COUNT(DISTINCT c.charging_station_id) as stations_used,
+            COUNT(*) as total_sessions,
+            ROUND(SUM(c.energy_consumed_kwh), 2) as total_energy_kwh,
+            ROUND(SUM(c.charging_cost_eur), 2) as total_revenue
+        FROM ev_charging_data c
+        LEFT JOIN ev_stations s ON c.charging_station_id = s.station_id
+        WHERE s.concelho IS NOT NULL
+    """
+    
+    if distrito:
+        query += " AND s.distrito = %s"
+        query += " GROUP BY s.distrito, s.concelho ORDER BY total_sessions DESC"
+        return execute_query(connection, query, (distrito,))
+    else:
+        query += " GROUP BY s.distrito, s.concelho ORDER BY total_sessions DESC LIMIT 30"
+        return execute_query(connection, query)
+
+
+def get_stations_with_no_usage(connection):
+    """
+    Find stations that exist in database but have no charging sessions.
+    """
+    query = """
+        SELECT 
+            s.station_id,
+            s.distrito,
+            s.concelho,
+            s.freguesia,
+            ROUND(s.potencia_maxima_kw, 2) as power_kw,
+            s.pontos_ligacao
+        FROM ev_stations s
+        LEFT JOIN ev_charging_data c ON s.station_id = c.charging_station_id
+        WHERE c.charging_station_id IS NULL
+        ORDER BY s.potencia_maxima_kw DESC
+        LIMIT 100
+    """
+    return execute_query(connection, query)
+
+
+def get_power_vs_usage_analysis(connection):
+    """
+    Compare station power capacity with actual usage.
+    """
+    query = """
+        SELECT 
+            CASE 
+                WHEN s.potencia_maxima_kw < 50 THEN '< 50 kW'
+                WHEN s.potencia_maxima_kw BETWEEN 50 AND 100 THEN '50-100 kW'
+                WHEN s.potencia_maxima_kw BETWEEN 100 AND 150 THEN '100-150 kW'
+                ELSE '> 150 kW'
+            END as power_range,
+            COUNT(DISTINCT s.station_id) as total_stations,
+            COUNT(DISTINCT c.charging_station_id) as stations_with_usage,
+            COUNT(c.id) as total_sessions,
+            ROUND(AVG(c.energy_consumed_kwh), 2) as avg_energy_per_session,
+            ROUND(AVG(c.charging_duration_hours), 2) as avg_duration_hours,
+            ROUND(AVG(s.potencia_maxima_kw), 2) as avg_station_power
+        FROM ev_stations s
+        LEFT JOIN ev_charging_data c ON s.station_id = c.charging_station_id
+        WHERE s.potencia_maxima_kw IS NOT NULL
+        GROUP BY power_range
+        ORDER BY avg_station_power
+    """
+    return execute_query(connection, query)
+
+
+def get_geographic_coverage_stats(connection):
+    """
+    Get comprehensive geographic coverage statistics.
+    """
+    query = """
+        SELECT 
+            'Total Coverage' as metric,
+            COUNT(DISTINCT distrito) as distritos,
+            COUNT(DISTINCT concelho) as concelhos,
+            COUNT(DISTINCT freguesia) as freguesias,
+            COUNT(*) as total_stations,
+            ROUND(AVG(potencia_maxima_kw), 2) as avg_power
+        FROM ev_stations
+        
+        UNION ALL
+        
+        SELECT 
+            'With Charging Sessions' as metric,
+            COUNT(DISTINCT s.distrito) as distritos,
+            COUNT(DISTINCT s.concelho) as concelhos,
+            COUNT(DISTINCT s.freguesia) as freguesias,
+            COUNT(DISTINCT s.station_id) as total_stations,
+            ROUND(AVG(s.potencia_maxima_kw), 2) as avg_power
+        FROM ev_stations s
+        INNER JOIN ev_charging_data c ON s.station_id = c.charging_station_id
+    """
+    return execute_query(connection, query)
+
+
+def get_stations_near_coordinates(connection, latitude, longitude, max_distance_km=10):
+    """
+    Find stations near specific coordinates using Haversine formula.
+    Note: This is an approximation. For production, use MySQL spatial functions.
+    """
+    query = """
+        SELECT 
+            station_id,
+            distrito,
+            concelho,
+            freguesia,
+            ROUND(potencia_maxima_kw, 2) as power_kw,
+            pontos_ligacao,
+            ROUND(latitude, 6) as lat,
+            ROUND(longitude, 6) as lon,
+            ROUND(
+                6371 * 2 * ASIN(SQRT(
+                    POWER(SIN((RADIANS(latitude) - RADIANS(%s)) / 2), 2) +
+                    COS(RADIANS(%s)) * COS(RADIANS(latitude)) *
+                    POWER(SIN((RADIANS(longitude) - RADIANS(%s)) / 2), 2)
+                )),
+                2
+            ) as distance_km
+        FROM ev_stations
+        WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+        HAVING distance_km <= %s
+        ORDER BY distance_km
+        LIMIT 50
+    """
+    return execute_query(connection, query, (latitude, latitude, longitude, max_distance_km))
+
+
+def get_station_density_by_area(connection):
+    """
+    Calculate station density (stations per concelho).
+    """
+    query = """
+        SELECT 
+            distrito,
+            concelho,
+            COUNT(*) as station_count,
+            SUM(pontos_ligacao) as total_connection_points,
+            ROUND(AVG(potencia_maxima_kw), 2) as avg_power,
+            ROUND(COUNT(*) / (SELECT COUNT(DISTINCT concelho) 
+                              FROM ev_stations s2 
+                              WHERE s2.distrito = s1.distrito), 2) as stations_per_concelho_in_distrito
+        FROM ev_stations s1
+        GROUP BY distrito, concelho
+        HAVING station_count >= 10
+        ORDER BY station_count DESC
+        LIMIT 30
+    """
+    return execute_query(connection, query)
+
+
+def get_top_locations_by_revenue(connection, limit=20):
+    """
+    Find top revenue-generating locations (distrito/concelho combinations).
+    """
+    query = """
+        SELECT 
+            s.distrito,
+            s.concelho,
+            COUNT(DISTINCT c.charging_station_id) as stations,
+            COUNT(*) as sessions,
+            ROUND(SUM(c.charging_cost_eur), 2) as total_revenue,
+            ROUND(AVG(c.charging_cost_eur), 2) as avg_cost_per_session,
+            ROUND(SUM(c.energy_consumed_kwh), 2) as total_energy_kwh
+        FROM ev_charging_data c
+        INNER JOIN ev_stations s ON c.charging_station_id = s.station_id
+        WHERE s.distrito IS NOT NULL AND s.concelho IS NOT NULL
+        GROUP BY s.distrito, s.concelho
+        ORDER BY total_revenue DESC
+        LIMIT %s
+    """
+    return execute_query(connection, query, (limit,))

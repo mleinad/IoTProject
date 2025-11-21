@@ -1,5 +1,7 @@
 import csv
 from datetime import datetime
+import mysql.connector
+
 
 def parse_csv_datetime(date_str):
     try:
@@ -24,7 +26,10 @@ def parse_int(value_str):
         return None
 
 
-def extract_ev_charging_data_simple(csv_file_path, connection, table_name):
+def extract_ev_charging_data_simple(connection, table_name):
+
+    csv_file_path="Data/EV_with_stations.csv"
+
     try:
         cursor = connection.cursor()
         row_count = 0
@@ -109,3 +114,103 @@ def extract_ev_charging_data_simple(csv_file_path, connection, table_name):
         print(f"Error importing data: {e}")
         connection.rollback()
         return False
+
+def extract_ev_stations(connection, table_name, batch_size=1000):
+
+    csv_file_path="Data/EV-Stations_with_ids_coords.csv"
+
+    try:
+        cursor = connection.cursor()
+        row_count = 0
+        batch_data = []
+        
+        with open(csv_file_path, 'r', encoding='utf-8-sig') as csv_file:
+            csv_reader = csv.DictReader(csv_file, delimiter=';')
+            csv_reader.fieldnames = [name.strip() for name in csv_reader.fieldnames]
+            
+            print(f"CSV Columns found: {csv_reader.fieldnames}\n")
+            
+            for row_num, row in enumerate(csv_reader, start=2):
+                try:
+                    row = {k.strip(): v.strip() if isinstance(v, str) else v for k, v in row.items()}
+                    
+                    # Add to batch instead of inserting immediately
+                    batch_data.append((
+                        row['Station ID'],
+                        row['Distrito'],
+                        row['Concelho'],
+                        row['Freguesia'],
+                        parse_decimal(row['Latitude']),
+                        parse_decimal(row['Longitude']),
+                        parse_decimal(row['Potência Máxima Admissível (kW)']),
+                        parse_int(row['Pontos de ligação para instalações de PCVE'])
+                    ))
+                    
+                    # Execute batch insert when batch_size is reached
+                    if len(batch_data) >= batch_size:
+                        cursor.executemany(
+                            f"""INSERT IGNORE INTO {table_name} 
+                               (station_id, distrito, concelho, freguesia, latitude, longitude,
+                                potencia_maxima_kw, pontos_ligacao)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                            batch_data
+                        )
+                        row_count += len(batch_data)
+                        print(f"Inserted batch: {row_count} stations processed")
+                        batch_data = []
+                        
+                except Exception as e:
+                    print(f"Row {row_num}: Error - {e}")
+                    continue
+            
+            # Insert remaining batch
+            if batch_data:
+                cursor.executemany(
+                    f"""INSERT IGNORE INTO {table_name} 
+                       (station_id, distrito, concelho, freguesia, latitude, longitude,
+                        potencia_maxima_kw, pontos_ligacao)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                    batch_data
+                )
+                row_count += len(batch_data)
+        
+        connection.commit()
+        print(f"\nSuccessfully imported: {row_count} stations")
+        cursor.close()
+        return True
+        
+    except mysql.connector.Error as e:
+        print(f"MySQL Error: {e}")
+        connection.rollback()
+        return False
+
+
+def import_both_datasets(connection):
+    """
+    Import both charging data and stations data.
+    
+    Args:
+        charging_csv_path: Path to the charging data CSV
+        stations_csv_path: Path to the stations CSV
+        connection: MySQL connection object
+    
+    Returns:
+        bool: True if both imports successful
+    """
+    print("=" * 60)
+    print("IMPORTING CHARGING DATA")
+    print("=" * 60)
+    charging_success = extract_ev_charging_data_simple(
+        connection, 
+        "ev_charging_data"
+    )
+    
+    print("\n" + "=" * 60)
+    print("IMPORTING STATIONS DATA")
+    print("=" * 60)
+    stations_success = extract_ev_stations(
+        connection, 
+        "ev_stations"
+    )
+    
+    return charging_success and stations_success

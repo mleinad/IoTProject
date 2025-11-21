@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from Database.mysql_connector import connect_mysql
 from Database.create_tables import create_denormalized_table, get_table_info, drop_all_tables
-from Database.extract_data import extract_ev_charging_data_simple
+from Database.extract_data import import_both_datasets
 from Database.queries import *
 
 def main():
@@ -13,13 +13,11 @@ def main():
     MYSQL_CONNECTOR_PASSWORD = os.getenv("MYSQL_DB_PASSWORD")
 
     mysql_database = "IoT_project"
-    csv_file_path = "Data/dataset-EV_with_stations.csv" 
 
     MYSQL_CONNECTOR = [MYSQL_CONNECTOR_HOST, 
                        MYSQL_CONNECTOR_USER, 
                        MYSQL_CONNECTOR_PASSWORD]
 
-#    drop_all_tables(connect_mysql(MYSQL_CONNECTOR, mysql_database))
 
     # Create database if it doesn't exist
 #    sqlConnection = connect_mysql(MYSQL_CONNECTOR, "")
@@ -33,6 +31,8 @@ def main():
     if sqlConnection is None:
         print(f"Failed to connect to database '{mysql_database}'")
         return
+    
+#    drop_all_tables(sqlConnection) #drop tables to apply changes
 
     # Create tables
     if not create_denormalized_table(sqlConnection):
@@ -42,19 +42,22 @@ def main():
 
     # Import CSV data
 #    print(f"Starting CSV import from: {csv_file_path}")
-    if extract_ev_charging_data_simple(csv_file_path, sqlConnection, "ev_charging_data"):
+    if import_both_datasets(sqlConnection):
         print("CSV data imported successfully!\n")
-        get_table_info(sqlConnection)
     else:
         print("CSV import failed!")
 
+    # Show statistics
+#    get_table_info(sqlConnection)
+
     # QUERIES
     # Run any query you want
-    results = get_station_utilization_rate(sqlConnection)
+    results = get_power_distribution(sqlConnection)
     for row in results[:5]:
         print(row)
     sqlConnection.close()
     print("\nDatabase connection closed")
+    print("\nNow run: streamlit run streamlit_dashboard.py")
 
 if __name__ == "__main__":
     main()
