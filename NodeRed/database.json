@@ -1,0 +1,162 @@
+[
+    {
+        "id": "c6eaed35c6501895",
+        "type": "tab",
+        "label": "Flow 1",
+        "disabled": false,
+        "info": "",
+        "env": []
+    },
+    {
+        "id": "inject1",
+        "type": "inject",
+        "z": "c6eaed35c6501895",
+        "name": "Auto Refresh",
+        "props": [
+            {
+                "p": "payload",
+                "v": "",
+                "vt": "date"
+            },
+            {
+                "p": "topic",
+                "v": "",
+                "vt": "str"
+            }
+        ],
+        "repeat": "30",
+        "topic": "",
+        "payload": "",
+        "x": 120,
+        "y": 60,
+        "wires": [
+            [
+                "template1"
+            ]
+        ]
+    },
+    {
+        "id": "template1",
+        "type": "template",
+        "z": "c6eaed35c6501895",
+        "name": "Query",
+        "field": "topic",
+        "fieldType": "msg",
+        "syntax": "mustache",
+        "template": "SELECT \n    DATE(charging_start_time) as date,\n    COUNT(*) as sessions,\n    ROUND(SUM(energy_consumed_kwh), 2) as energy\nFROM ev_charging_data\nGROUP BY DATE(charging_start_time)\nORDER BY date DESC\nLIMIT 10\n",
+        "x": 280,
+        "y": 60,
+        "wires": [
+            [
+                "mysql1"
+            ]
+        ]
+    },
+    {
+        "id": "mysql1",
+        "type": "mysql",
+        "z": "c6eaed35c6501895",
+        "mydb": "cc87cca9a8ad2046",
+        "name": "",
+        "x": 440,
+        "y": 60,
+        "wires": [
+            [
+                "function1"
+            ]
+        ]
+    },
+    {
+        "id": "function1",
+        "type": "function",
+        "z": "c6eaed35c6501895",
+        "name": "Format",
+        "func": "var dates = [];\nvar sessions = [];\nvar costs = [];\n\nmsg.payload.forEach(row => {\n    dates.push(row.date);\n    sessions.push(row.sessions);\n    costs.push(row.avg_cost);\n});\n\nmsg.payload = [{\n    series: ['Sessions', 'Avg Cost'],\n    data: [sessions, costs],\n    labels: dates\n}];\nreturn msg;",
+        "outputs": 1,
+        "x": 640,
+        "y": 60,
+        "wires": [
+            [
+                "chart1"
+            ]
+        ]
+    },
+    {
+        "id": "chart1",
+        "type": "ui_chart",
+        "z": "c6eaed35c6501895",
+        "name": "Weekly Overview",
+        "group": "34ced2f9390f881a",
+        "width": "",
+        "height": "",
+        "label": "",
+        "chartType": "line",
+        "xformat": "HH:mm:ss",
+        "nodata": "",
+        "dot": false,
+        "ymin": "",
+        "ymax": "",
+        "removeOlder": "",
+        "removeOlderPoints": "",
+        "cutout": "",
+        "useOneColor": false,
+        "useUTC": false,
+        "colors": [
+            "#1f77b4",
+            "#aec7e8",
+            "#ff7f0e",
+            "#2ca02c",
+            "#98df8a",
+            "#d62728",
+            "#ff9896",
+            "#9467bd",
+            "#c5b0d5"
+        ],
+        "outputs": 1,
+        "useDifferentColor": false,
+        "className": "",
+        "x": 910,
+        "y": 60,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "cc87cca9a8ad2046",
+        "type": "MySQLdatabase",
+        "name": "EV_Database",
+        "host": "localhost",
+        "port": "3306",
+        "db": "IoT_project",
+        "tz": "",
+        "charset": "UTF8"
+    },
+    {
+        "id": "34ced2f9390f881a",
+        "type": "ui_group",
+        "name": "Chart",
+        "tab": "175ee063e2cc05fb",
+        "order": 1,
+        "disp": true,
+        "width": 6,
+        "collapse": false,
+        "className": ""
+    },
+    {
+        "id": "175ee063e2cc05fb",
+        "type": "ui_tab",
+        "name": "Format",
+        "icon": "dashboard",
+        "disabled": false,
+        "hidden": false
+    },
+    {
+        "id": "ec9c736d8af0fad3",
+        "type": "global-config",
+        "env": [],
+        "modules": {
+            "node-red-node-mysql": "2.0.0",
+            "node-red-dashboard": "3.6.6"
+        }
+    }
+]
