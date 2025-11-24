@@ -1,0 +1,137 @@
+############################
+# FLUTTER / DART
+############################
+
+# Generated files
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+
+# Flutter build outputs
+build/
+flutter_*.png
+
+# iOS/Android platform dirs (only ignore if not used)
+# If your project is web-only, uncomment these:
+# android/
+# ios/
+# macos/
+# windows/
+# linux/
+
+# VSCode Dart debug configs
+**/*.flutter-plugins
+**/*.flutter-plugins-dependencies
+
+
+############################
+# DOCKER
+############################
+
+# Ignore local overrides
+docker-compose.override.yml
+
+# Docker build artifacts
+*.tar
+*.img
+
+# Volumes stored locally
+docker-data/
+volumes/
+data/
+
+# If you use Docker Desktop's internal data store (optional)
+.docker/
+
+
+############################
+# NODE-RED
+############################
+
+# Credentials file (contains passwords & JWTs)
+**/flows_cred.json
+
+# Auto-generated runtime files
+**/flows.json.backup
+**/flows*.backup
+**/.config.runtime.json
+
+# Node-RED working directory (if mounted as a host volume)
+node-red-data/
+node_modules/
+
+
+############################
+# PYTHON
+############################
+
+# Byte-compiled
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.env/
+.venv/
+
+# Jupyter
+.ipynb_checkpoints
+
+# Local Python caches
+*.log
+*.sqlite3
+
+
+############################
+# MYSQL (Docker-based)
+############################
+
+# Local MySQL volumes (never commit!)
+mysql/
+mysql-data/
+db-data/
+*.sql.gz
+*.dump
+
+
+############################
+# ENV / SECRETS
+############################
+
+# Environment variables
+.env
+.env.*
+*.env
+
+# Secrets in dev
+secret.json
+*.pem
+*.key
+*.crt
+
+
+############################
+# IDE / EDITOR
+############################
+
+# VS Code
+.vscode/
+.history/
+
+# IntelliJ / Android Studio
+.idea/
+*.iml
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+
+############################
+# LOG FILES
+############################
+
+*.log
+logs/
+**/log/
