@@ -20,11 +20,11 @@ def main():
 
 
     # Create database if it doesn't exist
-#    sqlConnection = connect_mysql(MYSQL_CONNECTOR, "")
-#    mycursor = sqlConnection.cursor()
-#    mycursor.execute(f"CREATE DATABASE IF NOT EXISTS {mysql_database}")
-#    print(f"Database '{mysql_database}' ready\n")
-#    sqlConnection.close()
+    sqlConnection = connect_mysql(MYSQL_CONNECTOR, "")
+    mycursor = sqlConnection.cursor()
+    mycursor.execute(f"CREATE DATABASE IF NOT EXISTS {mysql_database}")
+    print(f"Database '{mysql_database}' ready\n")
+    sqlConnection.close()
 
     # Connect to the database
     sqlConnection = connect_mysql(MYSQL_CONNECTOR, mysql_database)
