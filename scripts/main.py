@@ -57,7 +57,7 @@ def main():
         print(row)
     sqlConnection.close()
     print("\nDatabase connection closed")
-    print("\nNow run: streamlit run streamlit_dashboard.py")
+#    print("\nNow run: streamlit run streamlit_dashboard.py")
 
 if __name__ == "__main__":
     main()

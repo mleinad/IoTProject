@@ -1,11 +1,13 @@
-version: "3.9"
 
 services:
   mysql:
     image: mysql:8.0
+    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: 1234
       MYSQL_DATABASE: IoT_project
+      MYSQL_USER: iot_user
+      MYSQL_PASSWORD: iot_password
     volumes:
       - mysql-data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d
@@ -14,14 +16,15 @@ services:
 
   node-red:
     image: nodered/node-red:latest
+    restart: on-failure
     ports:
       - "1880:1880"
     depends_on:
       - mysql
     volumes:
-      - ./node-red:/data
+      - node-red-data:/data
     environment:
-      - FLOWS=/data/database.json
+      - FLOWS=database.json
 
   python-init:
     build: .
@@ -34,4 +37,5 @@ services:
 
 volumes:
   mysql-data:
+  node-red-data:
 

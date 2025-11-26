@@ -60,11 +60,17 @@
         "name": "",
         "x": 440,
         "y": 60,
-        "wires": [
-            [
-                "function1"
-            ]
-        ]
+        "wires": [["function1"]]
+    },
+    {
+        "id": "cc87cca9a8ad2046",
+        "type": "MySQLdatabase",
+        "name": "IoT Database",
+        "host": "mysql",
+        "port": "3306",
+        "db": "IoT_project",
+        "tz": "",
+        "charset": "UTF8"
     },
     {
         "id": "function1",
