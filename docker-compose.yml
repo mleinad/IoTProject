@@ -1,0 +1,91 @@
+
+services:
+  # MQTT Broker (Mosquitto)
+  mqtt-broker:
+    image: eclipse-mosquitto:latest
+    container_name: iot-mqtt-broker
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./Communication/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    networks:
+      - iot-network
+    restart: unless-stopped
+
+  # MySQL Database
+  mysql-db:
+    image: mysql:8.0
+    container_name: iot-mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: IoT_project
+      MYSQL_USER: ${MYSQL_DB_USER:-iot_user}
+      MYSQL_PASSWORD: ${MYSQL_DB_PASSWORD:-iot_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - iot-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # MQTT Processor
+  mqtt-processor:
+    build:
+      context: .
+      dockerfile: Dockerfile.processor
+    container_name: iot-mqtt-processor
+    depends_on:
+      mqtt-broker:
+        condition: service_started
+      mysql-db:
+        condition: service_healthy
+    environment:
+      MQTT_BROKER_HOST: mqtt-broker
+      MQTT_BROKER_PORT: 1883
+      MQTT_TOPIC: idc/fc01
+      MYSQL_HOST: mysql-db
+      MYSQL_USER: ${MYSQL_DB_USER:-iot_user}
+      MYSQL_PASSWORD: ${MYSQL_DB_PASSWORD:-iot_password}
+      MYSQL_DATABASE: IoT_project
+    volumes:
+      - ./Communication:/app/communication
+      - ./Data:/app/data
+      - ./Database/data_sql:/app/database
+    networks:
+      - iot-network
+    restart: unless-stopped
+
+  # Dashboard (Streamlit)
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.dashboard
+    container_name: iot-dashboard
+    ports:
+      - "8501:8501"
+    depends_on:
+      - mqtt-broker
+    environment:
+      MQTT_BROKER_HOST: mqtt-broker
+      MQTT_BROKER_PORT: 1883
+      MQTT_TOPIC: idc/fc01
+    volumes:
+      - ./Dashboard:/app/dashboard
+    networks:
+      - iot-network
+    restart: unless-stopped
+
+volumes:
+  mysql-data:
+
+networks:
+  iot-network:
+    driver: bridge

@@ -1,9 +1,9 @@
 import os
 from dotenv import load_dotenv
-from Database.mysql_connector import connect_mysql
-from Database.create_tables import create_denormalized_table, get_table_info, drop_all_tables
-from Database.extract_data import import_both_datasets
-from Database.queries import *
+from data_sql.mysql_connector import connect_mysql
+from data_sql.create_tables import create_denormalized_table, get_table_info, drop_all_tables
+from data_sql.extract_data import import_both_datasets
+from data_sql.queries import *
 
 def main():
     # Load environment variables

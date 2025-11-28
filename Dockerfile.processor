@@ -1,0 +1,25 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies
+RUN pip install --no-cache-dir \
+    paho-mqtt \
+    mysql-connector-python \
+    pandas \
+    python-dotenv
+
+# Copy application files
+COPY Communication /app/communication
+COPY Data /app/data
+COPY Database/data_sql /app/database
+
+# Set Python path
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+
+# Debug: Show what we have
+RUN echo "=== Files in /app/communication ===" && ls -la /app/communication/
+
+# Run the processor with debugging
+CMD ["python", "-u", "/app/communication/mqtt_processor.py"]
