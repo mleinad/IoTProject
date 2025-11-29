@@ -28,7 +28,7 @@ def parse_int(value_str):
 
 def extract_ev_charging_data_simple(connection, table_name):
 
-    csv_file_path="Data/EV_with_stations.csv"
+    csv_file_path="../../Data/EV_with_stations.csv"
 
     try:
         cursor = connection.cursor()
@@ -117,7 +117,7 @@ def extract_ev_charging_data_simple(connection, table_name):
 
 def extract_ev_stations(connection, table_name, batch_size=1000):
 
-    csv_file_path="Data/EV-Stations_with_ids_coords.csv"
+    csv_file_path="../../Data/EV-Stations_with_ids_coords.csv"
 
     try:
         cursor = connection.cursor()
